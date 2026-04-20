@@ -2,7 +2,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Status](https://img.shields.io/badge/status-prototype-orange)](#roadmap)
-[![License](https://img.shields.io/badge/license-TBD-lightgrey)](#license)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](#license)
 
 **A hybrid, institutional-style trading signal engine that combines quantitative models, rule-based risk controls, and optional LLM validation to produce risk-adjusted, execution-aware trade ideas.**
 
@@ -109,7 +109,7 @@ flowchart LR
 ### 1. Clone the repository
 
 ```bash
-git clone <YOUR_REPOSITORY_URL>
+git clone https://github.com/miladtm94/AI-Trading-Engine.git
 cd AI-Trading-Engine
 ```
 
@@ -235,17 +235,19 @@ AI-Trading-Engine/
 
 ## Screenshots / Demo
 
-Live UI screenshots are not included yet. The current project provides:
+The current project is CLI-based. Running the engine produces structured signal output like the example shown in the [Usage](#usage) section above.
 
-- A CLI-based signal generation workflow
-- Telegram-ready formatted outputs for bot integration
-- A demo sender script for pushing signals directly to Telegram
+To generate a live signal output in your terminal:
 
-Suggested additions for this section:
+```bash
+PYTHONPATH=src python -m ai_trading_engine --asset BTC/USDT
+```
 
-- Terminal screenshot of a generated signal
-- Telegram message preview
-- Architecture graphic or strategy dashboard
+To push a demo signal to Telegram:
+
+```bash
+PYTHONPATH=src python scripts/send_demo_signal.py
+```
 
 ## Performance / Benchmarks
 
@@ -301,19 +303,13 @@ Recommended contribution areas:
 
 ## License
 
-This repository is currently marked as **TBD**. Replace this section with your chosen license, for example:
+This project is licensed under the [Apache License 2.0](LICENSE).
 
-- MIT License
-- Apache License 2.0
-- GNU GPLv3
-
-If you plan to open-source the project, adding a `LICENSE` file is recommended before publication.
+You are free to use, modify, and distribute this software under the terms of the Apache 2.0 license. See the `LICENSE` file for the full license text.
 
 ## Author / Acknowledgements
 
-**Author:** [Your Name](https://github.com/<your-username>)  
-**LinkedIn:** [Your LinkedIn](https://linkedin.com/in/<your-profile>)  
-**Website:** [Your Website](https://<your-domain>)
+**Author:** [Milad TM](https://github.com/miladtm94)
 
 Acknowledgements:
 

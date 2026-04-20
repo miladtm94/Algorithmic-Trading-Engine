@@ -1,0 +1,41 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Demo Engine",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "ai_trading_engine",
+      "args": [
+        "--asset",
+        "ETH/USDT"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Run Demo Engine with LLM",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "ai_trading_engine",
+      "args": [
+        "--asset",
+        "ETH/USDT",
+        "--llm"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Run Telegram Sender",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/send_demo_signal.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    }
+  ]
+}
