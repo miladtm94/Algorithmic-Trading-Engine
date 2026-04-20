@@ -1,6 +1,7 @@
-.PHONY: help setup install install-dev install-prod clean \
+.PHONY: help setup install install-dev install-prod install-ml clean \
         run run-once run-paper run-live \
         backtest test test-cov lint format typecheck \
+        fetch-history build-dataset train evaluate \
         demo docker-build docker-run docker-stop env logs
 
 PYTHON  ?= python3
@@ -29,6 +30,13 @@ help:
 	@printf "\n\033[1mBacktesting\033[0m\n"
 	@printf "  make backtest         Run backtest on demo candle data\n"
 	@printf "  make backtest-live    Fetch historical data from exchange and backtest\n"
+	@printf "\n\033[1mML Pipeline\033[0m\n"
+	@printf "  make install-ml       Install scikit-learn + joblib\n"
+	@printf "  make fetch-history    Download multi-year OHLCV (asset=ETH/USD years=2)\n"
+	@printf "  make build-dataset    Build feature+label CSV from downloaded history\n"
+	@printf "  make train            Train RandomForest model (time-series split)\n"
+	@printf "  make evaluate         Score live signal with trained model (--now)\n"
+	@printf "  make evaluate-as-of   Evaluate accuracy at a past date (as_of=2024-01-01)\n"
 	@printf "\n\033[1mTesting & Quality\033[0m\n"
 	@printf "  make test             Run unit tests\n"
 	@printf "  make test-cov         Tests with HTML coverage report\n"
@@ -60,6 +68,9 @@ install-dev: $(VENV)/bin/activate
 
 install-prod: $(VENV)/bin/activate
 	$(PIP) install "ccxt>=4.0.0" "python-dotenv>=1.0.0"
+
+install-ml: $(VENV)/bin/activate
+	$(PIP) install "scikit-learn>=1.4.0" "joblib>=1.3.0"
 
 setup: $(VENV)/bin/activate install install-dev install-prod
 	@cp -n .env.example .env 2>/dev/null && printf "\033[33m.env created from .env.example — fill in your credentials\033[0m\n" || true
@@ -114,6 +125,40 @@ format: install-dev
 
 typecheck: install-dev
 	$(MYPY) src/ai_trading_engine/ --ignore-missing-imports --strict-optional
+
+# ── ML Pipeline ───────────────────────────────────────────────────────────────
+
+fetch-history: install install-prod install-ml
+	PYTHONPATH=src $(PY) scripts/fetch_history.py \
+	  --asset $(or $(asset),ETH/USDT) \
+	  --exchange $(or $(exchange),binance) \
+	  --timeframe $(or $(timeframe),1h) \
+	  --years $(or $(years),2)
+
+build-dataset: install install-ml
+	PYTHONPATH=src $(PY) scripts/build_dataset.py \
+	  --asset $(or $(asset),ETH/USD) \
+	  --timeframe $(or $(timeframe),1h) \
+	  --confluence $(or $(confluence),75.0)
+
+train: install install-ml
+	PYTHONPATH=src $(PY) scripts/train_model.py \
+	  --asset $(or $(asset),ETH/USD) \
+	  --timeframe $(or $(timeframe),1h)
+
+evaluate: install install-prod install-ml
+	@test -f .env || (printf "\033[31mCreate .env first\033[0m\n" && exit 1)
+	PYTHONPATH=src $(PY) scripts/evaluate_model.py \
+	  --asset $(or $(asset),ETH/USD) \
+	  --timeframe $(or $(timeframe),1h) \
+	  --now
+
+evaluate-as-of: install install-ml
+	@test -n "$(as_of)" || (printf "\033[31mUsage: make evaluate-as-of as_of=2024-01-01\033[0m\n" && exit 1)
+	PYTHONPATH=src $(PY) scripts/evaluate_model.py \
+	  --asset $(or $(asset),ETH/USD) \
+	  --timeframe $(or $(timeframe),1h) \
+	  --as-of $(as_of)
 
 # ── Docker ────────────────────────────────────────────────────────────────────
 

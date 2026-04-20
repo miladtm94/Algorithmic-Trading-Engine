@@ -17,6 +17,7 @@ from typing import Optional
 
 from .config import EngineConfig
 from .engine import HybridTradingEngine
+from .feature_extractor import extract_features
 from .models import (
     Candle,
     MarketSnapshot,
@@ -42,6 +43,7 @@ class BacktestTrade:
     pnl_pct: Optional[float] = None
     pnl_usd: Optional[float] = None
     outcome: Optional[str] = None
+    features: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -115,6 +117,8 @@ def _build_backtest_snapshot(
 class Backtester:
     def __init__(self, config: Optional[EngineConfig] = None) -> None:
         self._cfg = config or EngineConfig()
+        # Historical candles are intentionally "stale" — disable the freshness check
+        self._cfg.data_validation.stale_after_minutes = 999_999
         self._engine = HybridTradingEngine(self._cfg)
 
     def run(
@@ -183,6 +187,7 @@ class Backtester:
                         entry_idx=i,
                         confluence_score=s.confluence.total_score,
                         regime=s.candidate.regime.regime,
+                        features=extract_features(s),
                     )
                     trades.append(open_trade)
 

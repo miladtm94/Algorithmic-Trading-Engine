@@ -1,0 +1,28 @@
+Metadata-Version: 2.4
+Name: ai-trading-engine
+Version: 0.2.0
+Summary: Production-grade hybrid algorithmic trading engine
+Requires-Python: >=3.11
+Provides-Extra: llm
+Requires-Dist: openai>=1.40.0; extra == "llm"
+Provides-Extra: prod
+Requires-Dist: ccxt>=4.0.0; extra == "prod"
+Requires-Dist: python-dotenv>=1.0.0; extra == "prod"
+Provides-Extra: ml
+Requires-Dist: scikit-learn>=1.4.0; extra == "ml"
+Requires-Dist: joblib>=1.3.0; extra == "ml"
+Provides-Extra: dev
+Requires-Dist: ruff; extra == "dev"
+Requires-Dist: mypy; extra == "dev"
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: pytest-cov; extra == "dev"
+Provides-Extra: all
+Requires-Dist: openai>=1.40.0; extra == "all"
+Requires-Dist: ccxt>=4.0.0; extra == "all"
+Requires-Dist: python-dotenv>=1.0.0; extra == "all"
+Requires-Dist: scikit-learn>=1.4.0; extra == "all"
+Requires-Dist: joblib>=1.3.0; extra == "all"
+Requires-Dist: ruff; extra == "all"
+Requires-Dist: mypy; extra == "all"
+Requires-Dist: pytest; extra == "all"
+Requires-Dist: pytest-cov; extra == "all"
