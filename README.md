@@ -134,8 +134,8 @@ make train-signal asset=ETH/USDT timeframe=1h weekly_cap=10
 ### 1. Clone and enter the project
 
 ```bash
-git clone https://github.com/<your-username>/AI-Trading-Engine.git
-cd AI-Trading-Engine
+git clone https://github.com/miladtm94/Algorithmic-Trading-Engine.git
+cd Algorithmic-Trading-Engine
 ```
 
 ### 2. Create the environment
@@ -228,6 +228,25 @@ make typecheck
 make test
 ```
 
+### Git Publishing
+
+```bash
+make git-status
+make git-remote
+make git-commit-staged COMMIT_MSG="docs: polish public README and add license"
+make git-push
+```
+
+Use `make git-commit-all COMMIT_MSG="..."` only when every visible local change should be included in the commit.
+
+For a newly recreated remote repository that intentionally replaces previous remote history:
+
+```bash
+make git-push-force
+```
+
+`git-push-force` uses `--force-with-lease`, which is safer than a plain force push because it refuses to overwrite remote work that was updated unexpectedly.
+
 ## Repository Layout
 
 ```text
@@ -269,7 +288,7 @@ make test
 
 ## Generated Files
 
-The following are local/generated artifacts and are ignored by Git:
+The following local and generated artifacts are excluded from version control:
 
 - `.env`
 - `.env.*`
@@ -280,7 +299,7 @@ The following are local/generated artifacts and are ignored by Git:
 - `*.egg-info/`
 - build, cache, and coverage outputs
 
-Keep these files local unless you intentionally publish sanitized samples.
+Generated datasets, model artifacts, and reports should be regenerated locally or published separately as sanitized release assets when appropriate.
 
 ## Safety Model
 
@@ -293,7 +312,7 @@ This project is designed to be conservative by default:
 - the strict preset limits eligible setup families and trade frequency
 - the engine is allowed to abstain
 
-Before any live use, review `.env.example`, use sandbox/testnet mode where available, and verify exchange permissions manually.
+Live trading should only be enabled after independent review, sandbox testing where supported, and manual verification of exchange permissions.
 
 ## Development
 
@@ -321,24 +340,20 @@ The project is intentionally standard-library-first. Optional dependencies are g
 
 ## Documentation
 
-Start here when changing the research pipeline:
+Additional project documentation is available in the `docs/` directory:
 
-- [docs/ROADMAP.md](docs/ROADMAP.md) for the current implementation plan
-- [docs/DECISIONS.md](docs/DECISIONS.md) for design decisions
-- [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) for known limitations
-- [docs/research_upgrade_status.md](docs/research_upgrade_status.md) for active research notes and runbooks
+- [Roadmap](docs/ROADMAP.md): current implementation plan and research priorities
+- [Design Decisions](docs/DECISIONS.md): architectural and product decisions
+- [Known Issues](docs/KNOWN_ISSUES.md): limitations, risks, and open engineering work
+- [Research Status](docs/research_upgrade_status.md): current selective-deployment research notes, diagnostics, and runbooks
 
-Documentation update rule:
-
-- update the README when setup or usage changes
-- update the roadmap when phase, priority, or plan changes
-- update decisions for non-trivial design choices
-- update known issues when limitations are added or resolved
-- update research status after meaningful research-pipeline changes
+These documents are intended to make the project auditable: research changes, validation assumptions, and deployment constraints are recorded alongside the code.
 
 ## License
 
-Apache License 2.0 is intended for this project. Add a `LICENSE` file before public release if one is not already present.
+This project is licensed under the [Apache License 2.0](LICENSE).
+
+The Apache 2.0 license permits use, modification, and distribution under its stated terms, including preservation of copyright and license notices.
 
 ## Disclaimer
 
