@@ -9,7 +9,7 @@ import json
 import logging
 from pathlib import Path
 
-from .feature_extractor import FEATURE_NAMES, extract_features, features_to_row
+from .feature_extractor import extract_features, features_to_row
 from .models import FinalSignal
 
 logger = logging.getLogger(__name__)
@@ -61,7 +61,7 @@ class MLPredictor:
         asset: str,
         timeframe: str = "1h",
         model_dir: str | Path | None = None,
-    ) -> "MLPredictor":
+    ) -> MLPredictor:
         """Convenience constructor: load the model for a given asset+timeframe."""
         base = Path(model_dir) if model_dir else _DEFAULT_MODEL_DIR
         safe = asset.replace("/", "_")

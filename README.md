@@ -228,25 +228,6 @@ make typecheck
 make test
 ```
 
-### Git Publishing
-
-```bash
-make git-status
-make git-remote
-make git-commit-staged COMMIT_MSG="docs: polish public README and add license"
-make git-push
-```
-
-Use `make git-commit-all COMMIT_MSG="..."` only when every visible local change should be included in the commit.
-
-For a newly recreated remote repository that intentionally replaces previous remote history:
-
-```bash
-make git-push-force
-```
-
-`git-push-force` uses `--force-with-lease`, which is safer than a plain force push because it refuses to overwrite remote work that was updated unexpectedly.
-
 ## Repository Layout
 
 ```text
@@ -353,7 +334,6 @@ These documents are intended to make the project auditable: research changes, va
 
 This project is licensed under the [Apache License 2.0](LICENSE).
 
-The Apache 2.0 license permits use, modification, and distribution under its stated terms, including preservation of copyright and license notices.
 
 ## Disclaimer
 

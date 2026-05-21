@@ -75,6 +75,10 @@ class LLMConfig:
 @dataclass(slots=True)
 class EngineConfig:
     confluence_threshold: float = 75.0
+    # Optional selective-deployment gates. Leaving both as `None` preserves
+    # the default research engine behavior.
+    allowed_setup_families: frozenset[str] | None = None
+    max_trades_per_iso_week: int | None = None
     data_validation: DataValidationConfig = field(default_factory=DataValidationConfig)
     regime: RegimeConfig = field(default_factory=RegimeConfig)
     risk: RiskConfig = field(default_factory=RiskConfig)

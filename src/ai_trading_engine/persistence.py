@@ -9,9 +9,8 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 
 from .models import EngineDecision
 
@@ -76,7 +75,7 @@ def init_db() -> None:
 
 
 def save_decision(decision: EngineDecision) -> int:
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     with _connect() as conn:
         if decision.signal:
             s = decision.signal
@@ -128,7 +127,7 @@ def save_outcome(
     pnl_usd: float,
 ) -> None:
     outcome = "WIN" if pnl_usd > 0 else "LOSS"
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     with _connect() as conn:
         conn.execute(
             "INSERT INTO outcomes (decision_id, closed_at, exit_price, pnl_usd, outcome) VALUES (?,?,?,?,?)",
@@ -138,7 +137,7 @@ def save_outcome(
     logger.info("Outcome saved: decision_id=%d %s pnl=$%.2f", decision_id, outcome, pnl_usd)
 
 
-def query_stats(asset: Optional[str] = None) -> dict:
+def query_stats(asset: str | None = None) -> dict:
     """Return aggregate performance stats from stored outcomes."""
     where = "WHERE d.asset = ?" if asset else ""
     params = (asset,) if asset else ()

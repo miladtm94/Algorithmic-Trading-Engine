@@ -4,6 +4,11 @@ __pycache__/
 *.pyo
 *.pyd
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
 trade_log.csv
 
 # Local environment and credentials

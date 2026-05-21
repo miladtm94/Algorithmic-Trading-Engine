@@ -89,6 +89,17 @@ def main() -> None:
         help="Use exchange sandbox/testnet",
     )
     parser.add_argument(
+        "--preset",
+        choices=["default", "strict"],
+        default=os.getenv("ENGINE_PRESET", "default"),
+        help=(
+            "Engine policy preset. 'strict' restricts signals to the "
+            "RANGE_REJECTION_MEAN_REVERSION family, caps trades at 1 per ISO week, "
+            "lowers the confluence threshold to 55 to match the sparse-research "
+            "workflow, and halves per-trade risk. Matches the evidence as of 2026-04-25."
+        ),
+    )
+    parser.add_argument(
         "--log-level",
         default=os.getenv("LOG_LEVEL", "INFO"),
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
@@ -104,7 +115,21 @@ def main() -> None:
     cfg = EngineConfig()
     cfg.llm.enabled = args.llm
 
-    # Override risk params from environment if set
+    if args.preset == "strict":
+        cfg.confluence_threshold = 55.0
+        cfg.allowed_setup_families = frozenset({"RANGE_REJECTION_MEAN_REVERSION"})
+        cfg.max_trades_per_iso_week = 1
+        cfg.risk.risk_per_trade_pct = 0.005
+        # Mean-reversion setups target TP1 at ~1.1R by design. A 2.0R floor
+        # blocks the whole family and breaks research↔deployment alignment.
+        cfg.risk.min_rr = 1.0
+        # With weekly_cap=1 the engine trades at most ~52 times per year.
+        # A 3-loss kill switch with that cadence locks out the engine for
+        # months without informative recovery. 5 keeps a real safety brake
+        # but matches the slower trade tempo of the strict preset.
+        cfg.risk.kill_switch_after_losses = 5
+
+    # Override risk params from environment if set (takes precedence over preset)
     if os.getenv("RISK_PER_TRADE_PCT"):
         cfg.risk.risk_per_trade_pct = float(os.environ["RISK_PER_TRADE_PCT"])
     if os.getenv("MAX_CONCURRENT_TRADES"):

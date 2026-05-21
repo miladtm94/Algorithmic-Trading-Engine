@@ -13,13 +13,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies first (cache layer)
+# Copy package metadata and source before editable install
 COPY pyproject.toml .
+COPY src/ src/
 RUN pip install --no-cache-dir -e "." && \
     pip install --no-cache-dir "ccxt>=4.0.0" "python-dotenv>=1.0.0"
 
-# Copy source
-COPY src/ src/
 COPY scripts/ scripts/
 
 # Persistent data directory

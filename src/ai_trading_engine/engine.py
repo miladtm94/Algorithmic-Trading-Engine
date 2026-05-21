@@ -16,6 +16,7 @@ from .risk import (
     enforce_portfolio_constraints,
 )
 from .signal_generation import generate_candidate
+from .validation import iso_week
 
 
 class HybridTradingEngine:
@@ -40,6 +41,36 @@ class HybridTradingEngine:
                 signal=None,
                 no_trade_reason="Insufficient confluence from quant layer candidate generation.",
             )
+
+        if (
+            self.config.allowed_setup_families is not None
+            and candidate.setup_family not in self.config.allowed_setup_families
+        ):
+            allowed = ", ".join(sorted(self.config.allowed_setup_families))
+            return EngineDecision(
+                signal=None,
+                no_trade_reason=(
+                    f"Setup family {candidate.setup_family} not in allowed set "
+                    f"[{allowed}]."
+                ),
+            )
+
+        weekly_cap = self.config.max_trades_per_iso_week
+        if weekly_cap is not None and weekly_cap >= 0:
+            current_week = iso_week(snapshot.candles[-1].timestamp.isoformat())
+            taken_this_week = sum(
+                1
+                for stamp in portfolio.recent_trade_timestamps
+                if iso_week(stamp) == current_week
+            )
+            if taken_this_week >= weekly_cap:
+                return EngineDecision(
+                    signal=None,
+                    no_trade_reason=(
+                        f"Weekly cap reached ({taken_this_week}/{weekly_cap} for "
+                        f"{current_week})."
+                    ),
+                )
 
         confluence = score_candidate(candidate, snapshot, self.config.confluence_weights)
         if confluence.total_score < self.config.confluence_threshold:

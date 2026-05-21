@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from .models import Candle, EventRisk, MarketSnapshot, OrderBookSnapshot, PortfolioState
 
 
 def _build_downtrend_candles(count: int = 240, start_price: float = 3600.0) -> list[Candle]:
     candles: list[Candle] = []
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     price = start_price
     for i in range(count):
         ts = now - timedelta(hours=(count - i - 1))
@@ -16,7 +16,7 @@ def _build_downtrend_candles(count: int = 240, start_price: float = 3600.0) -> l
         close = max(200.0, price + drift + oscillation)
         high = max(price, close) + 7.0
         low = min(price, close) - 8.0
-        volume = 2500 + (i % 11) * 180
+        volume = 2500.0 + (i % 11) * 180.0
         if i == count - 1:
             volume *= 1.8
         candles.append(
@@ -47,7 +47,7 @@ def build_demo_snapshot(asset: str = "ETH/USDT") -> MarketSnapshot:
         order_book=order_book,
         spread_bps=4.0,
         depth_usd=950_000.0,
-        support_levels=[last * 0.995, last * 0.985, last * 0.972],
+        support_levels=[last * 0.985, last * 0.972, last * 0.958],
         resistance_levels=[last * 1.006, last * 1.013, last * 1.022],
         liquidation_clusters=[last * 0.99, last * 1.01],
         sentiment_score=-0.25,

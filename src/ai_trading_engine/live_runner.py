@@ -19,14 +19,14 @@ from __future__ import annotations
 import logging
 import signal as _signal
 import time
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
+from typing import Literal
 
 from .broker import LiveBroker, Order, PaperBroker
 from .config import EngineConfig
 from .engine import HybridTradingEngine
 from .formatters import format_decision
-from .models import EngineDecision, FinalSignal, PortfolioState
+from .models import Direction, EngineDecision, PortfolioState
 from .persistence import init_db, save_decision, save_outcome
 
 logger = logging.getLogger(__name__)
@@ -53,7 +53,7 @@ class TradingRunner:
         api_secret: str = "",
         sandbox: bool = False,
         initial_equity: float = 10_000.0,
-        engine_config: Optional[EngineConfig] = None,
+        engine_config: EngineConfig | None = None,
         telegram_bot=None,
         telegram_chat_id: str = "",
     ) -> None:
@@ -106,17 +106,22 @@ class TradingRunner:
 
         broker = self._broker
         equity = broker.equity
-        open_pos = {o.asset: o.direction for o in broker.open_orders}
+        open_pos: dict[str, Direction] = {o.asset: o.direction for o in broker.open_orders}
 
-        recent_results: list[str] = []
+        recent_results: list[Literal["WIN", "LOSS"]] = []
+        recent_stamps: list[str] = []
         if isinstance(broker, PaperBroker):
             for order in broker.trade_history[-30:]:
                 recent_results.append("WIN" if (order.pnl_usd or 0) > 0 else "LOSS")
+                recent_stamps.append(order.created_at.isoformat())
+            for order in broker.open_orders:
+                recent_stamps.append(order.created_at.isoformat())
 
         return PortfolioState(
             equity_usd=equity,
             open_positions=open_pos,
             recent_results=recent_results,
+            recent_trade_timestamps=recent_stamps,
         )
 
     # ── Single cycle ──────────────────────────────────────────────────────────
@@ -211,7 +216,7 @@ class TradingRunner:
             stats = self._broker.stats()
             logger.info("Final paper stats: %s", stats)
             print(f"\n{'─'*50}")
-            print(f"  PAPER TRADING SESSION SUMMARY  ({datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')})")
+            print(f"  PAPER TRADING SESSION SUMMARY  ({datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')})")
             print(f"{'─'*50}")
             print(f"  {stats}")
             print(f"{'─'*50}\n")

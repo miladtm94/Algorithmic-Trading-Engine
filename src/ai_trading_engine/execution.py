@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from .config import ExecutionConfig
 from .models import CandidateSignal, ExecutionPlan, MarketSnapshot, PositionPlan
 
@@ -24,6 +26,7 @@ def plan_execution(
         )
 
     breakout_context = signal.regime.strategy == "BREAKOUT"
+    order_type: Literal["LIMIT", "MARKET"]
     if breakout_context and cfg.breakout_market_order_allowed:
         order_type = "MARKET"
         max_slippage = min(35.0, snapshot.spread_bps * 2.5 + 6.0)

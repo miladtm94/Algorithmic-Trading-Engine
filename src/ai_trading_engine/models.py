@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal
 
-
 Direction = Literal["LONG", "SHORT"]
 RegimeType = Literal[
     "TRENDING_BULLISH",
@@ -13,6 +12,14 @@ RegimeType = Literal[
     "HIGH_VOLATILITY",
 ]
 StrategyType = Literal["TREND_FOLLOWING", "BREAKOUT", "MEAN_REVERSION"]
+SetupFamily = Literal[
+    "TREND_PULLBACK_CONTINUATION",
+    "BREAKOUT_RETEST_CONTINUATION",
+    "RANGE_REJECTION_MEAN_REVERSION",
+    "FAILED_BREAKOUT_REVERSAL",
+    "RESEARCH_TEMPLATE",
+    "GENERIC",
+]
 
 
 @dataclass(slots=True)
@@ -68,6 +75,10 @@ class PortfolioState:
     equity_usd: float
     open_positions: dict[str, Direction] = field(default_factory=dict)
     recent_results: list[Literal["WIN", "LOSS"]] = field(default_factory=list)
+    # ISO-format UTC timestamps (YYYY-MM-DDTHH:MM:SS...) for recent entries,
+    # used by engine-level selectivity gates such as weekly caps. Keep short:
+    # only the current and recent ISO weeks need to be present.
+    recent_trade_timestamps: list[str] = field(default_factory=list)
 
     @property
     def consecutive_losses(self) -> int:
@@ -120,6 +131,10 @@ class CandidateSignal:
     reasons: list[str]
     invalidation: str
     risk_reward: float
+    setup_family: SetupFamily = "GENERIC"
+    setup_quality: float = 0.0
+    max_hold_bars: int = 24
+    reference_level: float | None = None
 
 
 @dataclass(slots=True)

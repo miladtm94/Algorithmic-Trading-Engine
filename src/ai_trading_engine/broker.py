@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import logging
 import uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Literal, Optional
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any, Literal, cast
 
 from .models import Direction, FinalSignal
 
@@ -34,10 +34,10 @@ class Order:
     take_profit_3: float
     status: OrderStatus
     created_at: datetime
-    filled_at: Optional[datetime] = None
-    fill_price: Optional[float] = None
-    pnl_usd: Optional[float] = None
-    exchange_order_id: Optional[str] = None
+    filled_at: datetime | None = None
+    fill_price: float | None = None
+    pnl_usd: float | None = None
+    exchange_order_id: str | None = None
 
 
 @dataclass
@@ -83,7 +83,7 @@ class PaperBroker:
             take_profit_2=tps[1] if len(tps) > 1 else tps[0] if tps else signal.candidate.entry,
             take_profit_3=tps[2] if len(tps) > 2 else tps[-1] if tps else signal.candidate.entry,
             status="OPEN",
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         self._orders.append(order)
         logger.info(
@@ -132,7 +132,7 @@ class PaperBroker:
 
     def _close(self, order: Order, fill_price: float, pnl_usd: float, status: OrderStatus) -> None:
         order.status = status
-        order.filled_at = datetime.now(timezone.utc)
+        order.filled_at = datetime.now(UTC)
         order.fill_price = fill_price
         order.pnl_usd = pnl_usd
         self._equity += pnl_usd
@@ -247,7 +247,7 @@ class LiveBroker:
             take_profit_2=tps[1] if len(tps) > 1 else tps[0] if tps else signal.candidate.entry,
             take_profit_3=tps[2] if len(tps) > 2 else tps[-1] if tps else signal.candidate.entry,
             status="OPEN",
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
             exchange_order_id=raw.get("id"),
         )
         self._order_map[order.id] = order
@@ -258,8 +258,8 @@ class LiveBroker:
         )
         return order
 
-    def fetch_balance(self) -> dict:
-        return self._exchange.fetch_balance()
+    def fetch_balance(self) -> dict[str, Any]:
+        return cast(dict[str, Any], self._exchange.fetch_balance())
 
     @property
     def open_orders(self) -> list[Order]:

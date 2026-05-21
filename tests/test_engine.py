@@ -6,14 +6,13 @@ persistence (in-memory), paper broker, and market data utilities.
 from __future__ import annotations
 
 import math
-import sqlite3
 import tempfile
 import unittest
-from datetime import datetime, timezone
-from unittest.mock import MagicMock, patch
+from datetime import UTC, datetime
+from unittest.mock import MagicMock
 
 from ai_trading_engine import EngineConfig, HybridTradingEngine
-from ai_trading_engine.broker import Order, PaperBroker
+from ai_trading_engine.broker import PaperBroker
 from ai_trading_engine.demo_data import build_demo_portfolio, build_demo_snapshot
 from ai_trading_engine.models import (
     Candle,
@@ -23,11 +22,10 @@ from ai_trading_engine.models import (
     PortfolioState,
 )
 
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _make_candle(close: float, idx: int = 0) -> Candle:
-    ts = datetime(2024, 1, 1, idx % 24, 0, tzinfo=timezone.utc)
+    ts = datetime(2024, 1, 1, idx % 24, 0, tzinfo=UTC)
     spread = close * 0.002
     return Candle(
         timestamp=ts,
@@ -134,6 +132,55 @@ class TestEngine(unittest.TestCase):
         snapshot = build_demo_snapshot("ETH/USDT")
         decision = engine.evaluate(snapshot, build_demo_portfolio())
         self.assertFalse(decision.is_trade)
+
+    def test_allowed_setup_families_blocks_other_families(self) -> None:
+        # Demo snapshot emits a TREND_PULLBACK_CONTINUATION candidate. A
+        # whitelist that does not contain it must abstain with a clear reason.
+        cfg = EngineConfig()
+        cfg.allowed_setup_families = frozenset({"RANGE_REJECTION_MEAN_REVERSION"})
+        engine = HybridTradingEngine(cfg)
+        decision = engine.evaluate(build_demo_snapshot("ETH/USDT"), build_demo_portfolio())
+        self.assertFalse(decision.is_trade)
+        self.assertIn("not in allowed set", decision.no_trade_reason or "")
+
+    def test_allowed_setup_families_allows_matching_family(self) -> None:
+        # Whitelisting the family that the demo actually emits keeps the trade.
+        cfg = EngineConfig()
+        cfg.allowed_setup_families = frozenset({"TREND_PULLBACK_CONTINUATION"})
+        engine = HybridTradingEngine(cfg)
+        decision = engine.evaluate(build_demo_snapshot("ETH/USDT"), build_demo_portfolio())
+        self.assertTrue(decision.is_trade)
+
+    def test_max_trades_per_iso_week_blocks_when_cap_reached(self) -> None:
+        snapshot = build_demo_snapshot("ETH/USDT")
+        # Put a fake prior trade inside the same ISO week as the snapshot's
+        # last candle; the cap=1 gate must abstain.
+        stamp = snapshot.candles[-1].timestamp.isoformat()
+        portfolio = PortfolioState(
+            equity_usd=10_000.0,
+            recent_trade_timestamps=[stamp],
+        )
+        cfg = EngineConfig()
+        cfg.max_trades_per_iso_week = 1
+        engine = HybridTradingEngine(cfg)
+        decision = engine.evaluate(snapshot, portfolio)
+        self.assertFalse(decision.is_trade)
+        self.assertIn("Weekly cap reached", decision.no_trade_reason or "")
+
+    def test_max_trades_per_iso_week_allows_new_week(self) -> None:
+        snapshot = build_demo_snapshot("ETH/USDT")
+        # Timestamp from a clearly different ISO week (one year earlier) must
+        # not consume the cap for the snapshot's current week.
+        prior_stamp = datetime(2024, 4, 1, 0, 0, tzinfo=UTC).isoformat()
+        portfolio = PortfolioState(
+            equity_usd=10_000.0,
+            recent_trade_timestamps=[prior_stamp],
+        )
+        cfg = EngineConfig()
+        cfg.max_trades_per_iso_week = 1
+        engine = HybridTradingEngine(cfg)
+        decision = engine.evaluate(snapshot, portfolio)
+        self.assertTrue(decision.is_trade)
 
 
 # ── PaperBroker tests ─────────────────────────────────────────────────────────

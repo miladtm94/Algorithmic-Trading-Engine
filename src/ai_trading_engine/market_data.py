@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from .models import Candle, MarketSnapshot, OrderBookSnapshot
@@ -45,7 +45,7 @@ def _retry(fn, *, retries: int = 3, backoff: float = 2.0):
 def _candles_from_ohlcv(ohlcv: list[list]) -> list[Candle]:
     return [
         Candle(
-            timestamp=datetime.fromtimestamp(row[0] / 1000, tz=timezone.utc),
+            timestamp=datetime.fromtimestamp(row[0] / 1000, tz=UTC),
             open=float(row[1]),
             high=float(row[2]),
             low=float(row[3]),

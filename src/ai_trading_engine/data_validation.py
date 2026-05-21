@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from math import isnan
 
 from .config import DataValidationConfig
@@ -22,8 +22,8 @@ def validate_snapshot(snapshot: MarketSnapshot, cfg: DataValidationConfig) -> No
         raise DataValidationError("Candle timestamps are not sorted ascending.")
 
     last = snapshot.candles[-1]
-    now = datetime.now(timezone.utc)
-    last_ts = last.timestamp if last.timestamp.tzinfo else last.timestamp.replace(tzinfo=timezone.utc)
+    now = datetime.now(UTC)
+    last_ts = last.timestamp if last.timestamp.tzinfo else last.timestamp.replace(tzinfo=UTC)
     stale_minutes = (now - last_ts).total_seconds() / 60
     if stale_minutes > cfg.stale_after_minutes:
         raise DataValidationError(

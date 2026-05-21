@@ -27,10 +27,13 @@ def _rule_based_validation(
         return LLMDecision(False, "Conflict: LONG signal in bearish trend regime.")
     if signal.direction == "SHORT" and regime.regime == "TRENDING_BULLISH":
         return LLMDecision(False, "Conflict: SHORT signal in bullish trend regime.")
-    if confluence.total_score < 75:
-        return LLMDecision(False, "Confluence score below acceptance threshold.")
     if len(signal.reasons) < 3:
         return LLMDecision(False, "Insufficient multi-factor confluence.")
+    # The engine-level confluence threshold is the single source of truth for
+    # the confluence floor (see HybridTradingEngine.evaluate). A second
+    # hardcoded floor here diverges from research settings, so we only use the
+    # confluence breakdown for context, not as an extra gate.
+    _ = confluence
     return LLMDecision(True, "Rule-based validation passed.")
 
 

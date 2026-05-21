@@ -28,7 +28,7 @@ import logging
 import os
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -100,7 +100,7 @@ def fetch_full_history(
     logger.info(
         "Fetching %.4g years of %s [%s] from %s  (from %s)",
         years, asset, timeframe, exchange_id,
-        datetime.fromtimestamp(start_ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d"),
+        datetime.fromtimestamp(start_ms / 1000, tz=UTC).strftime("%Y-%m-%d"),
     )
 
     while since < now_ms:
@@ -164,7 +164,7 @@ def save_csv(rows: list[dict], path: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Download multi-year OHLCV history")
-    parser.add_argument("--asset", default=os.getenv("DEFAULT_ASSET", "ETH/USD"))
+    parser.add_argument("--asset", default=os.getenv("DEFAULT_ASSET", "ETH/USDT"))
     parser.add_argument(
         "--timeframe", default=os.getenv("DEFAULT_TIMEFRAME", "1h"),
         choices=list(_TIMEFRAME_MS),

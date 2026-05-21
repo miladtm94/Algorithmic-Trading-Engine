@@ -12,16 +12,15 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Optional
+from typing import Literal
 
 from .config import EngineConfig
+from .dataset import build_research_snapshot
 from .engine import HybridTradingEngine
 from .feature_extractor import extract_features
 from .models import (
     Candle,
     MarketSnapshot,
-    OrderBookSnapshot,
     PortfolioState,
 )
 
@@ -38,11 +37,14 @@ class BacktestTrade:
     entry_idx: int
     confluence_score: float
     regime: str
-    exit_price: Optional[float] = None
-    exit_idx: Optional[int] = None
-    pnl_pct: Optional[float] = None
-    pnl_usd: Optional[float] = None
-    outcome: Optional[str] = None
+    setup_family: str = "GENERIC"
+    max_hold_bars: int = 24
+    exit_price: float | None = None
+    exit_idx: int | None = None
+    pnl_pct: float | None = None
+    pnl_usd: float | None = None
+    outcome: Literal["WIN", "LOSS"] | None = None
+    exit_reason: str | None = None
     features: dict = field(default_factory=dict)
 
 
@@ -86,39 +88,18 @@ def _build_backtest_snapshot(
     asset: str,
     timeframe: str,
 ) -> MarketSnapshot:
-    current = candles[-1].close
-    spread = current * 0.0004  # simulate 4 bps spread
-    ob = OrderBookSnapshot(
-        bids=[(current - spread * i, 50_000.0) for i in range(1, 6)],
-        asks=[(current + spread * i, 50_000.0) for i in range(1, 6)],
-    )
-    highs = sorted({c.high for c in candles[-40:]})
-    lows = sorted({c.low for c in candles[-40:]})
-    resistances = [h for h in highs if h > current][-5:]
-    supports = [l for l in lows if l < current][:5]
-
-    return MarketSnapshot(
-        asset=asset,
-        timeframe=timeframe,
-        candles=candles,
-        order_book=ob,
-        spread_bps=4.0,
-        depth_usd=1_000_000.0,
-        support_levels=supports,
-        resistance_levels=resistances,
-        liquidation_clusters=[],
-        sentiment_score=0.0,
-        source_prices={"backtest": current},
-        correlation_to_open_positions={},
-        events=[],
-    )
+    """Backtest snapshots must match the research pipeline's structure read
+    so that what we measure in diagnostics is what the engine trades here."""
+    return build_research_snapshot(candles, asset, timeframe)
 
 
 class Backtester:
-    def __init__(self, config: Optional[EngineConfig] = None) -> None:
+    def __init__(self, config: EngineConfig | None = None) -> None:
         self._cfg = config or EngineConfig()
-        # Historical candles are intentionally "stale" — disable the freshness check
-        self._cfg.data_validation.stale_after_minutes = 999_999
+        # Historical candles are intentionally "stale" — disable the freshness
+        # check effectively (10 years in minutes is enough for any realistic
+        # historical backtest while keeping the check itself in place).
+        self._cfg.data_validation.stale_after_minutes = 365 * 24 * 60 * 10
         self._engine = HybridTradingEngine(self._cfg)
 
     def run(
@@ -140,8 +121,8 @@ class Backtester:
         peak_equity = equity
         max_drawdown = 0.0
         trades: list[BacktestTrade] = []
-        recent_results: list[str] = []
-        open_trade: Optional[BacktestTrade] = None
+        recent_results: list[Literal["WIN", "LOSS"]] = []
+        open_trade: BacktestTrade | None = None
 
         for i in range(window_size, len(candles) - 1):
             window = candles[i - window_size : i + 1]
@@ -149,8 +130,9 @@ class Backtester:
 
             # --- Manage open position against the next candle ---
             if open_trade is not None:
-                closed = self._check_close(open_trade, next_candle)
-                if closed:
+                bar_idx = i + 1
+                closed_position = self._check_close(open_trade, next_candle, bar_idx)
+                if closed_position:
                     pnl_usd = equity * risk_per_trade * (open_trade.pnl_pct or 0) / abs(
                         (open_trade.stop_loss - open_trade.entry_price) / open_trade.entry_price
                     ) if open_trade.entry_price != open_trade.stop_loss else 0
@@ -164,10 +146,16 @@ class Backtester:
             # --- Ask engine for a signal (only when flat) ---
             if open_trade is None:
                 snapshot = _build_backtest_snapshot(window, asset, timeframe)
+                recent_stamps = [
+                    candles[t.entry_idx].timestamp.isoformat()
+                    for t in trades
+                    if t.entry_idx is not None
+                ]
                 portfolio = PortfolioState(
                     equity_usd=equity,
                     open_positions={},
                     recent_results=recent_results,
+                    recent_trade_timestamps=recent_stamps,
                 )
                 try:
                     decision = self._engine.evaluate(snapshot, portfolio)
@@ -187,6 +175,8 @@ class Backtester:
                         entry_idx=i,
                         confluence_score=s.confluence.total_score,
                         regime=s.candidate.regime.regime,
+                        setup_family=s.candidate.setup_family,
+                        max_hold_bars=s.candidate.max_hold_bars,
                         features=extract_features(s),
                     )
                     trades.append(open_trade)
@@ -214,10 +204,10 @@ class Backtester:
             open_trade.pnl_usd = equity * risk_per_trade * raw_pnl
 
         # --- Aggregate statistics ---
-        closed = [t for t in trades if t.outcome is not None]
-        wins = [t for t in closed if t.outcome == "WIN"]
-        losses = [t for t in closed if t.outcome == "LOSS"]
-        win_rate = len(wins) / len(closed) if closed else 0.0
+        closed_trades = [t for t in trades if t.outcome is not None]
+        wins = [t for t in closed_trades if t.outcome == "WIN"]
+        losses = [t for t in closed_trades if t.outcome == "LOSS"]
+        win_rate = len(wins) / len(closed_trades) if closed_trades else 0.0
         total_return = (equity - initial_equity) / initial_equity * 100
 
         win_pnls = [t.pnl_pct or 0.0 for t in wins]
@@ -235,7 +225,7 @@ class Backtester:
             asset=asset,
             timeframe=timeframe,
             total_candles=len(candles),
-            total_trades=len(closed),
+            total_trades=len(closed_trades),
             winning_trades=len(wins),
             losing_trades=len(losses),
             win_rate=win_rate,
@@ -248,30 +238,61 @@ class Backtester:
             trades=trades,
         )
 
-    def _check_close(self, trade: BacktestTrade, candle: Candle) -> bool:
-        """Returns True if the trade should be closed on this candle."""
+    def _check_close(self, trade: BacktestTrade, candle: Candle, bar_idx: int) -> bool:
+        """Returns True if the trade should be closed on this candle.
+
+        Intrabar ordering pessimistically assumes the stop fills first when
+        both levels are touched inside the same bar, matching the research
+        labeling convention in dataset.label_trade_path.
+        """
+        bars_held = bar_idx - trade.entry_idx
         if trade.direction == "LONG":
-            if candle.low <= trade.stop_loss:
+            hit_stop = candle.low <= trade.stop_loss
+            hit_tp = candle.high >= trade.take_profit
+            if hit_stop:
                 trade.exit_price = trade.stop_loss
                 trade.pnl_pct = (trade.stop_loss - trade.entry_price) / trade.entry_price
                 trade.outcome = "LOSS"
+                trade.exit_reason = "STOP_LOSS"
+                trade.exit_idx = bar_idx
                 return True
-            if candle.high >= trade.take_profit:
+            if hit_tp:
                 trade.exit_price = trade.take_profit
                 trade.pnl_pct = (trade.take_profit - trade.entry_price) / trade.entry_price
                 trade.outcome = "WIN"
+                trade.exit_reason = "TAKE_PROFIT"
+                trade.exit_idx = bar_idx
                 return True
         else:  # SHORT
-            if candle.high >= trade.stop_loss:
+            hit_stop = candle.high >= trade.stop_loss
+            hit_tp = candle.low <= trade.take_profit
+            if hit_stop:
                 trade.exit_price = trade.stop_loss
                 trade.pnl_pct = (trade.entry_price - trade.stop_loss) / trade.entry_price
                 trade.outcome = "LOSS"
+                trade.exit_reason = "STOP_LOSS"
+                trade.exit_idx = bar_idx
                 return True
-            if candle.low <= trade.take_profit:
+            if hit_tp:
                 trade.exit_price = trade.take_profit
                 trade.pnl_pct = (trade.entry_price - trade.take_profit) / trade.entry_price
                 trade.outcome = "WIN"
+                trade.exit_reason = "TAKE_PROFIT"
+                trade.exit_idx = bar_idx
                 return True
+
+        # Family-specific horizon exit — matches research label horizon and
+        # prevents mean-reversion trades from holding forever when TP/SL both miss.
+        if bars_held >= max(1, trade.max_hold_bars):
+            if trade.direction == "LONG":
+                trade.pnl_pct = (candle.close - trade.entry_price) / trade.entry_price
+            else:
+                trade.pnl_pct = (trade.entry_price - candle.close) / trade.entry_price
+            trade.exit_price = candle.close
+            trade.outcome = "WIN" if (trade.pnl_pct or 0) > 0 else "LOSS"
+            trade.exit_reason = "HORIZON"
+            trade.exit_idx = bar_idx
+            return True
         return False
 
 
