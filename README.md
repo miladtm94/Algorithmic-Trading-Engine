@@ -1,322 +1,345 @@
 # AI Trading Engine
 
-[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Status](https://img.shields.io/badge/status-prototype-orange)](#roadmap)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](#license)
+[![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Status](https://img.shields.io/badge/status-research%20prototype-orange)](#project-status)
+[![Trading](https://img.shields.io/badge/live%20trading-disabled%20by%20default-red)](#safety-model)
 
-**A hybrid, institutional-style trading signal engine that combines quantitative models, rule-based risk controls, and optional LLM validation to produce risk-adjusted, execution-aware trade ideas.**
+AI Trading Engine is a Python research and execution prototype for crypto trade setup generation, filtering, backtesting, and selective ML-based trade selection.
 
-## Table of Contents
+The project is currently focused on ETH/USDT 1h research. Its design preference is conservative: produce fewer, better-supported setups and choose `NO_TRADE` when evidence is weak.
 
-- [Overview](#overview)
-- [Features](#features)
-- [Architecture / How It Works](#architecture--how-it-works)
-- [Tech Stack](#tech-stack)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Project Structure](#project-structure)
-- [Screenshots / Demo](#screenshots--demo)
-- [Performance / Benchmarks](#performance--benchmarks)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
+## Contents
+
+- [What It Does](#what-it-does)
+- [Project Status](#project-status)
+- [Architecture](#architecture)
+- [Research Workflow](#research-workflow)
+- [Quick Start](#quick-start)
+- [Configuration](#configuration)
+- [Common Commands](#common-commands)
+- [Repository Layout](#repository-layout)
+- [Generated Files](#generated-files)
+- [Safety Model](#safety-model)
+- [Development](#development)
+- [Documentation](#documentation)
 - [License](#license)
-- [Author / Acknowledgements](#author--acknowledgements)
 
-## Overview
+## What It Does
 
-`AI Trading Engine` is a modular Python trading framework designed to generate statistically grounded trading signals under explicit risk constraints. It evaluates market data through a multi-layer pipeline that validates inputs, classifies market regime, generates candidate setups, scores multi-factor confluence, enforces portfolio and execution rules, and optionally performs a final LLM-based consistency check before emitting a signal.
+The engine evaluates market snapshots through a layered decision pipeline:
 
-This project matters because most signal generators fail at the exact point that matters in production: risk realism. Instead of optimizing only for signal frequency, this engine prioritizes capital preservation, execution feasibility, and logical consistency. The result is a system that is useful both as a portfolio-ready prototype and as a strong foundation for research, backtesting, automation, and open-source collaboration.
+- validates candle and market data quality
+- computes indicators and market structure features
+- classifies market regime
+- generates candidate trade setups by setup family
+- scores confluence and applies risk filters
+- plans execution style
+- optionally validates the final decision with an LLM
+- emits a trade setup or an explicit no-trade decision
 
-Key differentiators:
+The research stack then turns those engine-generated setups into labeled datasets, audits setup-family quality, trains sparse selector models, and compares rule-based, model-based, and oracle-style selection limits.
 
-- Combines quant indicators, structure analysis, execution filters, and contextual validation in a single decision engine
-- Enforces hard constraints such as stop-loss requirement, confluence threshold, and minimum risk/reward
-- Produces Telegram-ready trade outputs for rapid integration into monitoring or alerting workflows
-- Keeps the architecture clean and extensible for live market data, backtesting, and bot deployment
+## Project Status
 
-## Features
+This repository is a research prototype moving toward production hardening.
 
-- Validate market data across multiple sources and reject stale or inconsistent snapshots
-- Classify market conditions into trend, range, and high-volatility regimes
-- Generate candidate trades using EMA, VWAP, RSI, MACD, ATR, Bollinger Bands, structure, and order-book imbalance
-- Score each setup with a weighted confluence model across trend, momentum, liquidity, structure, and sentiment
-- Enforce portfolio-level protections including risk caps, correlation filtering, concurrent trade limits, and loss-based kill-switch logic
-- Select execution style based on liquidity, spread, and breakout context
-- Pause or reduce trading around high-impact macro or market-moving events
-- Log completed trades and adapt factor weights for post-trade learning
-- Support optional LLM validation for final consistency and contextual sanity checks
+Working today:
 
-## Architecture / How It Works
+- core rule-based engine pipeline
+- demo, paper, backtest, and strict preset entrypoints
+- dense baseline dataset and model pipeline
+- sparse engine-candidate dataset pipeline
+- family-aware labels, diagnostics, and selector training
+- ETH/USDT 1h local research workflow
+- BTC/USDC 15m control workflow for selector experiments
 
-The engine is organized as a layered decision pipeline. Each layer has a single responsibility, making the system easier to test, extend, and reason about.
+Known limitations:
+
+- the sparse selector currently abstains after calibration
+- the ETH/USDT 1h candidate pool remains overall-negative under honest labels
+- walk-forward validation is not fully implemented
+- live execution wiring is not yet fully aligned with the sparse selector deployment path
+- market-context features are still partly simplified historical proxies
+
+See [docs/ROADMAP.md](docs/ROADMAP.md), [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md), and [docs/research_upgrade_status.md](docs/research_upgrade_status.md) for the active research state.
+
+## Architecture
+
+### Engine Pipeline
+
+```mermaid
+flowchart TD
+    A[Market snapshot] --> B[Data validation]
+    B --> C[Indicators and features]
+    C --> D[Regime classification]
+    D --> E[Setup family generation]
+    E --> F[Confluence scoring]
+    F --> G[Risk and portfolio filters]
+    G --> H[Execution planning]
+    H --> I[News and event filters]
+    I --> J[Optional LLM validation]
+    J --> K{Decision}
+    K --> L[Trade setup]
+    K --> M[No trade]
+```
+
+### Research Pipeline
+
+```mermaid
+flowchart TD
+    A[Historical OHLCV] --> B[Build research snapshots]
+    B --> C[Generate rule-engine candidates]
+    C --> D[Apply family-aware labels]
+    D --> E[Build sparse signal dataset]
+    E --> F[Diagnose family expectancy]
+    F --> G[Train sparse selector]
+    G --> H[Audit thresholds and weekly cap]
+    H --> I[Backtest or paper-trade strict preset]
+```
+
+### Runtime Modes
 
 ```mermaid
 flowchart LR
-    A["Market Snapshot"] --> B["Data Validation"]
-    B --> C["Indicator Computation"]
-    C --> D["Regime Classification"]
-    D --> E["Signal Generation"]
-    E --> F["Confluence Scoring"]
-    F --> G["Risk & Portfolio Filters"]
-    G --> H["Execution Planning"]
-    H --> I["Event / News Filter"]
-    I --> J["LLM Validation (Optional)"]
-    J --> K["Telegram-Ready Signal or No-Trade Decision"]
+    A[Demo mode] --> D[Generated data only]
+    B[Paper mode] --> E[Real market data, simulated orders]
+    C[Live mode] --> F[Real market data, real orders]
 ```
 
-### Decision Flow
+## Research Workflow
 
-1. **Validate inputs**  
-   Confirm candle integrity, timestamp freshness, and cross-source price consistency.
+The current selective-deployment workflow asks a practical question:
 
-2. **Classify the market regime**  
-   Detect whether the asset is trending, range-bound, or in a high-volatility state, then select the appropriate strategy bias.
+> Given the setups the engine can generate, which small number should be taken?
 
-3. **Generate a candidate trade**  
-   Use technical indicators, price structure, and order-flow context to construct a long or short setup with entry, stop-loss, and targets.
+The sparse selector is intentionally different from a dense candle classifier. It does not force a long or short prediction on every candle. It trains only on engine-generated candidates and evaluates whether a small weekly trade budget can select higher-quality opportunities.
 
-4. **Score confluence**  
-   Aggregate weighted evidence across trend alignment, momentum, volume/liquidity, structure, and sentiment.
+Recommended loop after candidate-rule changes:
 
-5. **Apply risk and execution constraints**  
-   Reject trades that violate portfolio rules, minimum risk/reward, depth requirements, spread limits, or estimated slippage tolerance.
-
-6. **Run contextual validation**  
-   Use event filters and optional LLM review to catch conflicting logic or elevated uncertainty before publishing a final signal.
-
-## Tech Stack
-
-### Core
-
-- **Language:** Python 3.11+
-- **Packaging:** `setuptools`, `pyproject.toml`
-- **Testing:** `unittest`
-
-### Trading Logic
-
-- **Indicators:** EMA, VWAP, RSI, MACD, ATR, Bollinger Bands
-- **Signal Inputs:** Market structure, support/resistance, liquidity context, order-book imbalance
-- **Risk Engine:** Position sizing, correlation checks, risk caps, kill-switch logic
-
-### Integrations
-
-- **Messaging:** Telegram Bot API
-- **LLM Validation:** OpenAI Python SDK (optional extra)
-
-## Installation
-
-### 1. Clone the repository
+1. Rebuild the sparse dataset.
+2. Diagnose family expectancy and oracle limits.
+3. Train or retrain the sparse selector.
+4. Compare validation/test behavior under `weekly_cap=1` and `weekly_cap=10`.
+5. Update the research notes if behavior changed.
 
 ```bash
-git clone https://github.com/miladtm94/AI-Trading-Engine.git
+make build-signal-dataset asset=ETH/USDT timeframe=1h
+make diagnose-signal-dataset asset=ETH/USDT timeframe=1h weekly_cap=1
+make diagnose-signal-dataset asset=ETH/USDT timeframe=1h weekly_cap=10
+make train-signal asset=ETH/USDT timeframe=1h weekly_cap=10
+```
+
+## Quick Start
+
+### 1. Clone and enter the project
+
+```bash
+git clone https://github.com/<your-username>/AI-Trading-Engine.git
 cd AI-Trading-Engine
 ```
 
-### 2. Create and activate a virtual environment
+### 2. Create the environment
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
+make setup
+make install-ml
 ```
 
-### 3. Install the package
+`make setup` creates `.venv`, installs core/dev/prod dependencies, and creates a local `.env` from `.env.example` when one does not already exist.
+
+### 3. Run the demo
 
 ```bash
-pip install -e .
+make run
 ```
 
-### 4. Optional: enable LLM validation
+Demo mode uses generated data and does not connect to an exchange.
+
+### 4. Run tests
 
 ```bash
-pip install -e ".[llm]"
-export OPENAI_API_KEY="<your_openai_api_key>"
+make test
 ```
 
-### 5. Optional: configure Telegram delivery
+## Configuration
+
+Runtime configuration lives in `.env`.
+
+The repository includes `.env.example` as a template. The real `.env` file is intentionally ignored by Git and should never be committed.
+
+Important variables:
+
+| Variable | Purpose |
+| --- | --- |
+| `TRADING_MODE` | `demo`, `paper`, or `live` |
+| `DEFAULT_ASSET` | Default symbol, for example `ETH/USDT` |
+| `DEFAULT_TIMEFRAME` | Default timeframe, for example `1h` |
+| `EXCHANGE` | CCXT exchange id, for example `binance` |
+| `EXCHANGE_API_KEY` | Optional exchange key |
+| `EXCHANGE_API_SECRET` | Optional exchange secret |
+| `EXCHANGE_SANDBOX` | Whether to use exchange sandbox/testnet support |
+| `TELEGRAM_BOT_TOKEN` | Optional Telegram alert token |
+| `TELEGRAM_CHAT_ID` | Optional Telegram destination |
+| `OPENAI_API_KEY` | Optional LLM validation key |
+
+## Common Commands
+
+### Running
 
 ```bash
-export TELEGRAM_BOT_TOKEN="<your_bot_token>"
-export TELEGRAM_CHAT_ID="<your_chat_id>"
+make run
+make run-once
+make run-paper
+make run-paper-strict
 ```
 
-## Usage
-
-### Run the demo engine from the CLI
+### Backtesting
 
 ```bash
-PYTHONPATH=src python -m ai_trading_engine --asset ETH/USDT
+make backtest
+make backtest-strict history_csv=data/historical/ETH_USDT_1h.csv
+make backtest-history history_csv=data/historical/ETH_USDT_1h.csv preset=strict start=2024-10-01
 ```
 
-### Run with optional LLM validation
+### Dense Baseline Research
 
 ```bash
-PYTHONPATH=src python -m ai_trading_engine --asset BTC/USDT --llm
+make fetch-history asset=ETH/USDT exchange=binance timeframe=1h years=2
+make build-dataset asset=ETH/USDT timeframe=1h
+make train asset=ETH/USDT timeframe=1h
+make evaluate-at asset=ETH/USDT timeframe=1h at='2026-03-15 09:00'
 ```
 
-### Send a demo signal to Telegram
+### Sparse Signal Research
 
 ```bash
-PYTHONPATH=src python scripts/send_demo_signal.py
+make build-signal-dataset asset=ETH/USDT timeframe=1h
+make diagnose-signal-dataset asset=ETH/USDT timeframe=1h weekly_cap=1
+make diagnose-signal-families asset=ETH/USDT timeframe=1h
+make train-signal asset=ETH/USDT timeframe=1h
+make evaluate-signal-at asset=ETH/USDT timeframe=1h at='2026-04-18 08:00'
 ```
 
-### Example output
+### Quality
+
+```bash
+make lint
+make typecheck
+make test
+```
+
+## Repository Layout
 
 ```text
-id="trading-signal"
-📊 Asset: ETH/USDT
-📈 Direction: SHORT
-
-🧠 Market Regime: Trending Bearish → Trend Following
-
-📊 Confluence Score: 79.7%
-
-🔍 Signal Factors:
-- EMA 20/50/200 bearish alignment
-- MACD histogram negative
-- RSI bearish momentum
-- Volume expansion confirms sell-off
-- Order book ask-side imbalance
-
-💰 Trade Setup:
-- Entry: 3,207.90
-- Stop Loss: 3,230.61
-- Take Profit:
-  - TP1: 3,162.47
-  - TP2: 3,139.76
-  - TP3: 3,117.04
+.
+|-- Makefile
+|-- pyproject.toml
+|-- README.md
+|-- docker-compose.yml
+|-- docs/
+|   |-- DECISIONS.md
+|   |-- KNOWN_ISSUES.md
+|   |-- ROADMAP.md
+|   `-- research_upgrade_status.md
+|-- scripts/
+|   |-- backtest.py
+|   |-- build_dataset.py
+|   |-- build_signal_dataset.py
+|   |-- diagnose_signal_dataset.py
+|   |-- diagnose_signal_families.py
+|   |-- evaluate_model.py
+|   |-- evaluate_signal_model.py
+|   |-- fetch_history.py
+|   |-- train_model.py
+|   `-- train_signal_model.py
+|-- src/
+|   `-- ai_trading_engine/
+|       |-- __main__.py
+|       |-- backtester.py
+|       |-- dataset.py
+|       |-- engine.py
+|       |-- feature_extractor.py
+|       |-- signal_generation.py
+|       |-- signal_learning.py
+|       `-- validation.py
+`-- tests/
+    |-- test_engine.py
+    `-- test_research_pipeline.py
 ```
 
-### Programmatic usage
+## Generated Files
 
-```python
-from ai_trading_engine import EngineConfig, HybridTradingEngine
-from ai_trading_engine.demo_data import build_demo_portfolio, build_demo_snapshot
-from ai_trading_engine.formatters import format_decision
+The following are local/generated artifacts and are ignored by Git:
 
-engine = HybridTradingEngine(EngineConfig())
-snapshot = build_demo_snapshot("ETH/USDT")
-portfolio = build_demo_portfolio()
+- `.env`
+- `.env.*`
+- `data/historical/*.csv`
+- `data/features/*.csv`
+- `data/models/`
+- `data/reports/`
+- `*.egg-info/`
+- build, cache, and coverage outputs
 
-decision = engine.evaluate(snapshot, portfolio)
-print(format_decision(decision))
-```
+Keep these files local unless you intentionally publish sanitized samples.
 
-## Project Structure
+## Safety Model
 
-```text
-AI-Trading-Engine/
-├── pyproject.toml
-├── README.md
-├── scripts/
-│   └── send_demo_signal.py
-├── src/
-│   └── ai_trading_engine/
-│       ├── __main__.py
-│       ├── config.py
-│       ├── confluence.py
-│       ├── data_validation.py
-│       ├── demo_data.py
-│       ├── engine.py
-│       ├── execution.py
-│       ├── formatters.py
-│       ├── indicators.py
-│       ├── learning.py
-│       ├── llm_validation.py
-│       ├── models.py
-│       ├── news.py
-│       ├── regime.py
-│       ├── risk.py
-│       ├── signal_generation.py
-│       └── telegram_bot.py
-└── tests/
-    └── test_engine.py
-```
+This project is designed to be conservative by default:
 
-## Screenshots / Demo
+- demo mode uses generated data only
+- paper mode uses real market data with simulated execution
+- live mode is explicit and should be treated as real-money trading
+- `.env` and secret-like files are ignored by Git
+- the strict preset limits eligible setup families and trade frequency
+- the engine is allowed to abstain
 
-The current project is CLI-based. Running the engine produces structured signal output like the example shown in the [Usage](#usage) section above.
+Before any live use, review `.env.example`, use sandbox/testnet mode where available, and verify exchange permissions manually.
 
-To generate a live signal output in your terminal:
+## Development
+
+Install development tools:
 
 ```bash
-PYTHONPATH=src python -m ai_trading_engine --asset BTC/USDT
+make setup
+make install-ml
 ```
 
-To push a demo signal to Telegram:
+Run the standard checks:
 
 ```bash
-PYTHONPATH=src python scripts/send_demo_signal.py
+make lint
+make typecheck
+make test
 ```
 
-## Performance / Benchmarks
+The project is intentionally standard-library-first. Optional dependencies are grouped in `pyproject.toml`:
 
-This repository does **not** make live trading or profitability claims. Performance evaluation is intentionally conservative at this stage.
+- `llm` for OpenAI validation
+- `prod` for exchange connectivity and dotenv loading
+- `ml` for scikit-learn and joblib
+- `dev` for linting, typing, and tests
 
-Current engineering validation includes:
+## Documentation
 
-- Unit-tested trade and no-trade decision paths
-- Deterministic risk enforcement before signal publication
-- Confluence thresholding with minimum risk/reward constraints
-- Execution feasibility checks using spread, depth, and slippage estimates
+Start here when changing the research pipeline:
 
-Planned benchmark categories:
+- [docs/ROADMAP.md](docs/ROADMAP.md) for the current implementation plan
+- [docs/DECISIONS.md](docs/DECISIONS.md) for design decisions
+- [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) for known limitations
+- [docs/research_upgrade_status.md](docs/research_upgrade_status.md) for active research notes and runbooks
 
-- Historical backtest performance by asset and regime
-- Signal precision and expectancy metrics
-- Execution-quality analysis under varying liquidity conditions
-- Regime classification accuracy and false-positive rates
+Documentation update rule:
 
-## Roadmap
-
-- Add live exchange adapters for market data and order-book ingestion
-- Introduce historical backtesting and walk-forward validation
-- Build portfolio analytics and strategy performance dashboards
-- Support multi-asset scanning and ranked signal output
-- Expand event ingestion with economic calendar and market news feeds
-- Add persistent storage for trades, signals, and learning metrics
-- Expose a formal API layer for service-based deployment
-- Harden observability with structured logging and monitoring hooks
-
-## Contributing
-
-Contributions are welcome, especially in the areas of data engineering, quant research, execution modeling, and infrastructure.
-
-Before opening a pull request:
-
-1. Create a focused branch for your change.
-2. Keep modules small, composable, and well documented.
-3. Add or update tests for behavioral changes.
-4. Run the local test suite before submitting:
-
-```bash
-PYTHONPATH=src python -m unittest discover -s tests -v
-```
-
-Recommended contribution areas:
-
-- Exchange integrations
-- Backtesting and simulation
-- Risk modeling improvements
-- Signal scoring research
-- Documentation and examples
+- update the README when setup or usage changes
+- update the roadmap when phase, priority, or plan changes
+- update decisions for non-trivial design choices
+- update known issues when limitations are added or resolved
+- update research status after meaningful research-pipeline changes
 
 ## License
 
-This project is licensed under the [Apache License 2.0](LICENSE).
+Apache License 2.0 is intended for this project. Add a `LICENSE` file before public release if one is not already present.
 
-You are free to use, modify, and distribute this software under the terms of the Apache 2.0 license. See the `LICENSE` file for the full license text.
+## Disclaimer
 
-## Author / Acknowledgements
-
-**Author:** [Milad TM](https://github.com/miladtm94)
-
-Acknowledgements:
-
-- Open-source Python ecosystem for packaging and testing foundations
-- Telegram Bot API for lightweight delivery workflows
-- OpenAI SDK for optional contextual validation support
-
----
-
-Built for systematic trading research, execution realism, and production-minded signal delivery.
+This repository is for software engineering and trading research. It does not provide financial advice, does not guarantee profitability, and should not be used with real funds without independent review, testing, and risk controls.

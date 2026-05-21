@@ -1,2 +1,0 @@
-[console_scripts]
-ai-trading-engine = ai_trading_engine.__main__:main

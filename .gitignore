@@ -5,3 +5,27 @@ __pycache__/
 *.pyd
 .pytest_cache/
 trade_log.csv
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*credentials*
+*secret*
+*token*
+
+# Generated research artifacts
+data/models/
+data/reports/
+data/features/*.csv
+data/historical/*.csv
+
+# Packaging/build outputs
+*.egg-info/
+build/
+dist/
